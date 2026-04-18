@@ -452,7 +452,7 @@
           <video class="leak-video" src="leak.mp4" autoplay muted loop playsinline></video>
         </div>
         <div class="media-layer" id="media-valve">
-          <img class="valve-img" src="valve.png" alt="Example of a main water shut-off valve behind an access panel" />
+          <img class="valve-img" src="valve.jpg" alt="Example of a main water shut-off valve behind an access panel" />
         </div>
         <div class="media-layer" id="media-booking">
           <div class="booking-card">
@@ -542,35 +542,47 @@
   // ---------------- Voice helpers ----------------
   // Uses the browser's Web Speech API to actually speak Alex's lines.
   let voiceEnabled = true;
-  let _selectedVoice = null;
-  function pickVoice() {
-    if (_selectedVoice) return _selectedVoice;
+  const _voiceCache = { agent: null, customer: null };
+  function pickVoice(role) {
+    if (_voiceCache[role]) return _voiceCache[role];
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
-    // Prefer a US male voice, fall back to any English voice.
-    const preferred = [
-      v => /en-US/.test(v.lang) && /male|Alex|Fred|Daniel|Matthew|Guy|David/i.test(v.name),
+    // Alex (agent) should sound different from the caller — go male vs. female.
+    const agentPreferred = [
+      v => /en-US/.test(v.lang) && /Alex|Fred|Daniel|Matthew|Guy|David|Aaron|Tom|male/i.test(v.name),
+      v => /en-US/.test(v.lang) && !/female|samantha|zira|victoria|karen|moira|fiona|susan|alice/i.test(v.name),
       v => /en-US/.test(v.lang),
       v => /^en/.test(v.lang),
-      () => true,
     ];
+    const customerPreferred = [
+      v => /en-US/.test(v.lang) && /Samantha|Victoria|Karen|Zira|Allison|Susan|Ava|Eva|Nicky|female/i.test(v.name),
+      v => /en-(GB|AU)/.test(v.lang) && /Karen|Moira|Fiona|Serena|Kate/i.test(v.name),
+      v => /en-US/.test(v.lang) && v !== _voiceCache.agent,
+      v => /^en/.test(v.lang) && v !== _voiceCache.agent,
+    ];
+    const preferred = role === 'customer' ? customerPreferred : agentPreferred;
     for (const test of preferred) {
       const v = voices.find(test);
-      if (v) return (_selectedVoice = v);
+      if (v) return (_voiceCache[role] = v);
     }
     return null;
   }
   if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => { _selectedVoice = null; pickVoice(); };
+    window.speechSynthesis.onvoiceschanged = () => {
+      _voiceCache.agent = null; _voiceCache.customer = null;
+      pickVoice('agent'); pickVoice('customer');
+    };
   }
-  function speak(text, { onEnd } = {}) {
+  function speak(text, { onEnd, role = 'agent' } = {}) {
     if (!voiceEnabled || !('speechSynthesis' in window)) { if (onEnd) onEnd(); return 900; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice();
+    const v = pickVoice(role);
     if (v) u.voice = v;
-    u.rate = 1.0;
-    u.pitch = 1.0;
+    // Nudge pitch/rate so the two voices are clearly different even on systems
+    // where only one TTS voice is available.
+    u.rate = role === 'customer' ? 1.05 : 1.0;
+    u.pitch = role === 'customer' ? 1.2 : 0.9;
     u.onend = () => { if (onEnd) onEnd(); };
     window.speechSynthesis.speak(u);
     // Rough duration estimate for UI indicator — 160 wpm.
@@ -600,6 +612,7 @@
   function customerSay(text) {
     startTimer();
     addLine('customer', 'Caller', text);
+    speak(text, { role: 'customer' });
   }
   function systemNote(text) {
     addLine('system', '', text);
@@ -644,24 +657,9 @@
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
-  const leakPhoto = makeSvgDataUrl(`
-    <rect width='300' height='220' fill='#0f172a'/>
-    <rect x='0' y='160' width='300' height='60' fill='#334155'/>
-    <rect x='120' y='40' width='60' height='18' rx='4' fill='#cbd5e1'/>
-    <rect x='140' y='56' width='20' height='80' rx='3' fill='#94a3b8'/>
-    <ellipse cx='150' cy='160' rx='50' ry='6' fill='#1e293b'/>
-    <circle cx='150' cy='148' r='4' fill='#60a5fa'/>
-    <circle cx='150' cy='138' r='3' fill='#3b82f6'/>
-    <circle cx='150' cy='130' r='2' fill='#60a5fa' opacity='0.6'/>
-    <text x='150' y='210' fill='#94a3b8' font-family='Inter' font-size='12' text-anchor='middle'>Under-sink photo</text>
-  `);
-  const customerValve = makeSvgDataUrl(`
-    <rect width='300' height='220' fill='#0f172a'/>
-    <rect x='40' y='40' width='220' height='140' rx='8' fill='#1e293b'/>
-    <rect x='120' y='60' width='60' height='100' rx='6' fill='#eab308'/>
-    <rect x='108' y='100' width='84' height='14' rx='4' fill='#334155'/>
-    <text x='150' y='200' fill='#94a3b8' font-family='Inter' font-size='12' text-anchor='middle'>Customer photo of valve</text>
-  `);
+  // Real photos attached from the repo root — keep these filenames in sync with the repo.
+  const leakPhoto = 'Leak.png';
+  const customerValve = 'valve.jpg';
 
   // ---------------- Combined MMS+Voice flow ----------------
   const mmsSteps = [
@@ -745,21 +743,30 @@
       }
     },
     {
-      t: 'Alex walks through the shut-off + books the job',
-      d: 'Voice guidance + CRM handoff',
+      t: 'Alex walks through the shut-off',
+      d: 'Voice guidance · customer confirms water is off',
       run: () => {
         agentSay("Perfect. Go ahead and turn that valve a quarter turn to the right — clockwise — until it stops. Let me know when the water's off.", () => {
           setTimeout(() => customerSay("Okay... water's off!"), 900);
+        });
+      }
+    },
+    {
+      t: 'Alex transitions to booking the appointment',
+      d: 'Voice handoff + CRM lead created',
+      run: () => {
+        agentSay("That's good, you should be good to turn off the water. Now let's get an appointment on the books so one of our plumbers can get that fixed for you.", () => {
+          logEvent('voice', `<span class="k">tool.create_lead</span> priority=emergency`);
+          logEvent('sys', `<span class="k">owner.alert</span> sent via SMS+email (&lt;30s)`);
           setTimeout(() => {
-            agentSay("Nice work — you just saved yourself a much bigger repair. I'm flagging this as an emergency. I can either send our on-call plumber out tonight at the after-hours rate, or book you first thing tomorrow at 8 AM. Which works better?", () => {
-              logEvent('voice', `<span class="k">tool.create_lead</span> priority=emergency`);
-              logEvent('sys', `<span class="k">owner.alert</span> sent via SMS+email (&lt;30s)`);
+            agentSay("I can send our on-call plumber out tonight at the after-hours rate, or book you first thing tomorrow at 8 AM. Which works better?", () => {
+              setTimeout(() => customerSay("Tomorrow at 8 is great, thank you."), 600);
               setTimeout(() => {
                 addBubble('them', '📄 Summary: supply-line leak, water shut off at main. Tech will be prepped.', '9:47 PM');
                 logEvent('mms', `<span class="k">sms.send</span> job_summary`);
-              }, 1200);
+              }, 1800);
             });
-          }, 1400);
+          }, 900);
         });
       }
     }
