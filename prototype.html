@@ -102,7 +102,9 @@
   @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5);} 70% { box-shadow: 0 0 0 18px rgba(59,130,246,0);} 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0);} }
   .call-head .meta .name { font-weight: 700; font-size: 16px; }
   .call-head .meta .sub { font-size: 12px; color: rgba(255,255,255,0.6); }
-  .call-timer { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 14px; background: rgba(255,255,255,0.08); padding: 6px 10px; border-radius: 8px; }
+  .call-timer { font-variant-numeric: tabular-nums; font-size: 14px; background: rgba(255,255,255,0.08); padding: 6px 10px; border-radius: 8px; }
+  .voice-toggle { margin-left: auto; font-size: 12px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; cursor: pointer; }
+  .voice-toggle:hover { background: rgba(255,255,255,0.14); }
   .status-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #34d399; font-weight: 600; margin-top: 6px; }
   .status-live .dot { width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 4px rgba(52,211,153,0.2); }
 
@@ -385,6 +387,7 @@
               </span>
             </div>
           </div>
+          <button id="voice-toggle" onclick="toggleVoice()" title="Toggle speech" class="voice-toggle">🔊 Voice on</button>
           <div class="call-timer" id="timer">00:00</div>
         </div>
         <div class="transcript" id="transcript">
@@ -537,15 +540,62 @@
   }
 
   // ---------------- Voice helpers ----------------
+  // Uses the browser's Web Speech API to actually speak Alex's lines.
+  let voiceEnabled = true;
+  let _selectedVoice = null;
+  function pickVoice() {
+    if (_selectedVoice) return _selectedVoice;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    // Prefer a US male voice, fall back to any English voice.
+    const preferred = [
+      v => /en-US/.test(v.lang) && /male|Alex|Fred|Daniel|Matthew|Guy|David/i.test(v.name),
+      v => /en-US/.test(v.lang),
+      v => /^en/.test(v.lang),
+      () => true,
+    ];
+    for (const test of preferred) {
+      const v = voices.find(test);
+      if (v) return (_selectedVoice = v);
+    }
+    return null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => { _selectedVoice = null; pickVoice(); };
+  }
+  function speak(text, { onEnd } = {}) {
+    if (!voiceEnabled || !('speechSynthesis' in window)) { if (onEnd) onEnd(); return 900; }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    u.onend = () => { if (onEnd) onEnd(); };
+    window.speechSynthesis.speak(u);
+    // Rough duration estimate for UI indicator — 160 wpm.
+    return Math.max(900, (text.split(/\s+/).length / 160) * 60 * 1000);
+  }
+  function toggleVoice() {
+    voiceEnabled = !voiceEnabled;
+    if (!voiceEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    const btn = document.getElementById('voice-toggle');
+    if (btn) btn.textContent = voiceEnabled ? '🔊 Voice on' : '🔇 Voice off';
+  }
   function agentSay(text, cb) {
     startTimer();
     document.getElementById('speaking').style.display = 'inline-flex';
     addLine('agent', 'Alex', text);
-    // give it a moment to simulate TTS
-    setTimeout(() => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
       document.getElementById('speaking').style.display = 'none';
       if (cb) cb();
-    }, 900);
+    };
+    const approxMs = speak(text, { onEnd: finish });
+    // Safety: if speech API silently fails (autoplay blocked), fall back to a timer.
+    setTimeout(finish, approxMs + 1500);
   }
   function customerSay(text) {
     startTimer();
@@ -787,6 +837,7 @@
   function applyCallStep(i) {
     const s = callSteps[i];
     document.getElementById('call-narration').textContent = s.narr;
+    speak(s.narr);
     const badges = document.getElementById('call-badges');
     badges.innerHTML = '';
     s.badges.forEach(b => {
