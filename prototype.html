@@ -707,7 +707,7 @@
           setTimeout(() => {
             logEvent('sys', `<span class="k">vision.analyze</span> model=claude-sonnet-4 → <span class="ok">emergency=true, type=supply_leak, location=under_sink</span>`);
             // now voice agent picks up
-            agentSay("Okay, I can see it. That's your hot-water supply line leaking at the faucet connection — active drip onto the cabinet floor. Let's stop the water first. Do you know where your main shut-off is?", () => {
+            agentSay("Okay, I can see it. That's your hot-water supply line leaking at the faucet connection. It looks like it is dripping onto the cabinet floor. Let's stop the water first. Do you know where your main shut-off is?", () => {
               setTimeout(() => {
                 customerSay("No, I have no idea where it is.");
               }, 400);
