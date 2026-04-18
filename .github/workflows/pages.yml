@@ -1,4 +1,3 @@
-
 name: Deploy site to GitHub Pages
 
 on:
@@ -23,8 +22,8 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          # The site lives inside ligato-repo-clean/ because that's how the zip extracted.
-          path: ./ligato-repo-clean
+          # Serve from the repo root (site files live there now).
+          path: .
 
   deploy:
     needs: build
