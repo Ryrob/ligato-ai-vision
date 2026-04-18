@@ -211,7 +211,10 @@
     transition: all 0.15s ease;
   }
   .step:hover { border-color: var(--brand); box-shadow: 0 4px 10px rgba(37,99,235,0.08); }
-  .step.done { opacity: 0.55; }
+  .step.done { opacity: 0.55; cursor: default; }
+  .step.done:hover { border-color: var(--line); box-shadow: none; }
+  .step.locked { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
+  .step.locked:hover { border-color: var(--line); box-shadow: none; }
   .step.active { border-color: var(--brand); background: #eff6ff; }
   .step .n { flex: 0 0 24px; height: 24px; border-radius: 8px; background: var(--panel-muted); border: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
   .step.active .n { background: var(--brand); color: #fff; border-color: transparent; }
@@ -452,7 +455,7 @@
           <video class="leak-video" src="leak.mp4" autoplay muted loop playsinline></video>
         </div>
         <div class="media-layer" id="media-valve">
-          <img class="valve-img" src="valve.jpg" alt="Example of a main water shut-off valve behind an access panel" />
+          <img class="valve-img" src="valve.jpeg" alt="Example of a main water shut-off valve behind an access panel" />
         </div>
         <div class="media-layer" id="media-booking">
           <div class="booking-card">
@@ -659,7 +662,7 @@
 
   // Real photos attached from the repo root — keep these filenames in sync with the repo.
   const leakPhoto = 'Leak.png';
-  const customerValve = 'valve.jpg';
+  const customerValve = 'valve.jpeg';
 
   // ---------------- Combined MMS+Voice flow ----------------
   const mmsSteps = [
@@ -778,9 +781,18 @@
     el.innerHTML = '';
     mmsSteps.forEach((s, i) => {
       const b = document.createElement('button');
-      b.className = 'step' + (i === mmsCursor ? ' active' : (i < mmsCursor ? ' done' : ''));
+      const isActive = i === mmsCursor;
+      const isDone = i < mmsCursor;
+      const isLocked = i > mmsCursor;
+      b.className = 'step' + (isActive ? ' active' : '') + (isDone ? ' done' : '') + (isLocked ? ' locked' : '');
+      b.disabled = isLocked || isDone;
       b.innerHTML = `<div class="n">${i+1}</div><div><div class="t">${s.t}</div><div class="d">${s.d}</div></div>`;
-      b.onclick = () => { if (i < mmsCursor) return; mmsSteps[i].run(); mmsCursor = i+1; renderMmsControls(); };
+      b.onclick = () => {
+        if (i !== mmsCursor) return; // only the next step is clickable
+        mmsSteps[i].run();
+        mmsCursor = i + 1;
+        renderMmsControls();
+      };
       el.appendChild(b);
     });
     document.getElementById('mms-next').disabled = mmsCursor >= mmsSteps.length;
@@ -804,21 +816,24 @@
   const callSteps = [
     {
       t: 'Customer shows the leak on camera',
-      narr: 'I can see a steady drip from the supply line under your sink. That\'s worth stopping now before it causes cabinet damage.',
+      agent: "I can see a steady drip from the supply line under your sink. That's worth stopping now before it causes cabinet damage.",
+      caller: "Yeah, it just started tonight. Can this wait until morning?",
       badges: ['Diagnosing', 'Emergency'],
       media: 'video',
       annotate: { x: '44%', y: '52%', w: '18%', h: '22%', tag: 'Active leak' }
     },
     {
       t: 'Agent guides to the main shut-off',
-      narr: 'Your main shut-off is usually on the lowest floor, about 3–4 feet up on an exterior wall, often behind a small access panel. It\'ll look like this — I\'m sending a reference photo now. Go find yours and I\'ll confirm before you turn anything.',
+      agent: "Probably not — let's stop the water first. Your main shut-off is usually on the lowest floor, about three to four feet up on an exterior wall, often behind a small access panel. I'm texting you a reference photo right now. Go find yours and I'll confirm before you turn anything.",
+      caller: "Okay, let me go check the garage.",
       badges: ['Reference image sent', 'Safety: appliance check'],
       media: 'valve',
       annotate: null
     },
     {
       t: 'Agent books the appointment',
-      narr: 'Great — water\'s off. I can send the on-call tech tonight at the after-hours rate, or book you first thing tomorrow. 10 AM–noon works with your schedule?',
+      agent: "Great — water's off. I can send our on-call tech tonight at the after-hours rate, or book you first thing tomorrow. Does ten to noon work?",
+      caller: "Tomorrow at ten sounds great, thank you.",
       badges: ['Booking', 'Handoff ready'],
       media: 'booking',
       annotate: null
@@ -830,11 +845,23 @@
     el.innerHTML = '';
     callSteps.forEach((s, i) => {
       const b = document.createElement('button');
-      b.className = 'step' + (i === callCursor ? ' active' : (i < callCursor ? ' done' : ''));
+      const isActive = i === callCursor;
+      const isDone = i < callCursor;
+      const isLocked = i > callCursor;
+      b.className = 'step' + (isActive ? ' active' : '') + (isDone ? ' done' : '') + (isLocked ? ' locked' : '');
+      b.disabled = isLocked || isDone;
       b.innerHTML = `<div class="n">${i+1}</div><div><div class="t">${s.t}</div></div>`;
-      b.onclick = () => { callCursor = i; applyCallStep(i); callCursor = i+1; renderCallControls(); };
+      b.onclick = () => {
+        if (i !== callCursor) return; // only the next step is clickable
+        applyCallStep(i);
+        callCursor = i + 1;
+        renderCallControls();
+      };
       el.appendChild(b);
     });
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
   function setCallMedia(which) {
     ['video', 'valve', 'booking'].forEach(k => {
@@ -843,8 +870,17 @@
   }
   function applyCallStep(i) {
     const s = callSteps[i];
-    document.getElementById('call-narration').textContent = s.narr;
-    speak(s.narr);
+    const narr = document.getElementById('call-narration');
+    // Show Alex's line first; once she's done speaking, append the caller's reply and speak it.
+    narr.innerHTML = `<div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#2563eb;text-transform:uppercase;margin-bottom:4px;">Alex</div>${escapeHtml(s.agent)}`;
+    speak(s.agent, {
+      role: 'agent',
+      onEnd: () => {
+        if (!s.caller) return;
+        narr.innerHTML += `<div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;text-transform:uppercase;margin:10px 0 4px;">Caller</div>${escapeHtml(s.caller)}`;
+        setTimeout(() => speak(s.caller, { role: 'customer' }), 200);
+      },
+    });
     const badges = document.getElementById('call-badges');
     badges.innerHTML = '';
     s.badges.forEach(b => {
