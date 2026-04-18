@@ -89,7 +89,8 @@
   .chat-line.me { flex-direction: row-reverse; }
   .chat-line.me .b { background: var(--brand); color: #fff; }
   .mini-img {
-    display: inline-block; background: linear-gradient(135deg, #93c5fd, #2563eb); width: 120px; height: 80px; border-radius: 8px; margin-top: 6px;
+    display: block; width: 150px; height: 110px; border-radius: 10px; margin-top: 6px;
+    object-fit: cover; border: 1px solid rgba(0,0,0,0.08);
   }
   .demo-right { color: #e2e8f0; }
   .demo-right h3 { margin: 0 0 10px; font-size: 16px; color: #fff; }
@@ -227,7 +228,7 @@
         <div class="chat-line me">
           <div class="a">C</div>
           <div class="b">
-            <div class="mini-img" style="margin-top:0;"></div>
+            <img class="mini-img" src="leak.png" alt="Under-sink supply line leaking onto a towel" style="margin-top:0;" />
           </div>
         </div>
         <div class="chat-line"><div class="a">A</div><div class="b" style="background:#f1f5f9; color: var(--ink);">Got it — reviewing now ✅</div></div>
@@ -238,10 +239,10 @@
         <h3>Two channels. One brain.</h3>
         <ul>
           <li>Voice agent runs the whole conversation</li>
-          <li>MMS is strictly for sending photos, videos &amp; confirmations</li>
+          <li>Agent uses text channel to analyze videos and photos</li>
           <li>Vision model reviews the image in &lt;5 seconds</li>
           <li>Voice agent picks right back up with what it saw</li>
-          <li>Customer never has to type a long message</li>
+          <li>When needed, the agent sends helpful images for emergency next steps</li>
         </ul>
       </div>
     </div>

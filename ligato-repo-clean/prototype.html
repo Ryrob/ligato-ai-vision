@@ -258,6 +258,28 @@
   }
   .video-stage .sim-faucet { position: absolute; inset: 0; display: grid; place-items: center; }
   .faucet-svg { width: 60%; max-width: 300px; opacity: 0.95; filter: drop-shadow(0 8px 30px rgba(0,0,0,0.4)); }
+  .media-layer { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+  .media-layer.active { display: flex; }
+  .leak-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .valve-img { max-width: 72%; max-height: 82%; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 3px solid rgba(255,255,255,0.1); }
+  .booking-card {
+    width: 78%; max-width: 420px; background: #0b1220; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px; padding: 20px 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); color: #e2e8f0;
+    font-family: 'Inter', sans-serif;
+  }
+  .booking-card h4 { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+  .booking-card .day { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+  .booking-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .booking-slot {
+    font-size: 12px; font-weight: 600; text-align: center; padding: 10px 6px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; background: rgba(255,255,255,0.04);
+  }
+  .booking-slot.selected { background: #2563eb; color: #fff; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.25); }
+  .booking-slot.full { opacity: 0.4; text-decoration: line-through; }
+  .booking-confirm {
+    width: 100%; padding: 10px; border-radius: 10px; background: #2563eb; color: #fff;
+    font-size: 13px; font-weight: 700; border: 0; text-align: center;
+  }
   .drop { animation: drip 1.4s infinite; transform-origin: center; }
   @keyframes drip { 0%,70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(18px); } }
   .annotation {
@@ -424,20 +446,26 @@
     <div class="call-wrap">
       <div class="video-stage" id="video-stage">
         <div class="sim"></div>
-        <div class="sim-faucet">
-          <svg class="faucet-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="10" y="150" width="180" height="40" fill="#334155" />
-            <rect x="10" y="148" width="180" height="4" fill="#475569" />
-            <ellipse cx="100" cy="162" rx="60" ry="10" fill="#0f172a" />
-            <rect x="92" y="60" width="16" height="70" rx="4" fill="#94a3b8" />
-            <rect x="70" y="52" width="60" height="14" rx="6" fill="#cbd5e1" />
-            <rect x="78" y="40" width="44" height="14" rx="3" fill="#94a3b8" />
-            <rect x="94" y="130" width="12" height="18" rx="2" fill="#64748b" />
-            <circle class="drop" cx="100" cy="146" r="4" fill="#60a5fa" />
-            <circle class="drop" cx="100" cy="146" r="3" fill="#3b82f6" style="animation-delay:0.7s" />
-            <rect x="85" y="165" width="30" height="30" fill="#1e293b" />
-            <circle cx="100" cy="180" r="5" fill="#60a5fa" opacity="0.8" />
-          </svg>
+        <div class="media-layer active" id="media-video">
+          <video class="leak-video" src="leak.mp4" autoplay muted loop playsinline></video>
+        </div>
+        <div class="media-layer" id="media-valve">
+          <img class="valve-img" src="valve.png" alt="Example of a main water shut-off valve behind an access panel" />
+        </div>
+        <div class="media-layer" id="media-booking">
+          <div class="booking-card">
+            <h4>Schedule your plumber visit</h4>
+            <div class="day">Tomorrow · Saturday, April 18</div>
+            <div class="booking-grid">
+              <div class="booking-slot full">8–10 AM</div>
+              <div class="booking-slot selected">10 AM–12 PM</div>
+              <div class="booking-slot">12–2 PM</div>
+              <div class="booking-slot">2–4 PM</div>
+              <div class="booking-slot">4–6 PM</div>
+              <div class="booking-slot full">6–8 PM</div>
+            </div>
+            <button class="booking-confirm">Confirm 10 AM–12 PM</button>
+          </div>
         </div>
         <div id="annotation-layer"></div>
         <div class="pip">
@@ -726,22 +754,25 @@
   // ---------------- Live call flow ----------------
   const callSteps = [
     {
-      t: 'Customer starts camera on the leak',
+      t: 'Customer shows the leak on camera',
       narr: 'I can see a steady drip from the supply line under your sink. That\'s worth stopping now before it causes cabinet damage.',
       badges: ['Diagnosing', 'Emergency'],
+      media: 'video',
       annotate: { x: '44%', y: '52%', w: '18%', h: '22%', tag: 'Active leak' }
     },
     {
-      t: 'Customer asks "Is this the shut-off?"',
-      narr: 'Yes — the yellow-handled lever on the main supply line. Turn it a quarter turn to the right until it stops.',
-      badges: ['Shut-off located', 'Safety: appliance check'],
-      annotate: { x: '36%', y: '30%', w: '28%', h: '40%', tag: 'Main shut-off' }
+      t: 'Agent guides to the main shut-off',
+      narr: 'Your main shut-off is usually on the lowest floor, about 3–4 feet up on an exterior wall, often behind a small access panel. It\'ll look like this — I\'m sending a reference photo now. Go find yours and I\'ll confirm before you turn anything.',
+      badges: ['Reference image sent', 'Safety: appliance check'],
+      media: 'valve',
+      annotate: null
     },
     {
-      t: 'Customer shares phone screen to book',
-      narr: 'I\'ve reserved the 8–10 AM slot tomorrow. Tap "Confirm" and you\'re set. Tech will call 30 minutes out.',
-      badges: ['Booked', 'Handoff ready'],
-      annotate: { x: '28%', y: '58%', w: '44%', h: '14%', tag: 'Confirm booking' }
+      t: 'Agent books the appointment',
+      narr: 'Great — water\'s off. I can send the on-call tech tonight at the after-hours rate, or book you first thing tomorrow. 10 AM–noon works with your schedule?',
+      badges: ['Booking', 'Handoff ready'],
+      media: 'booking',
+      annotate: null
     }
   ];
   let callCursor = 0;
@@ -756,17 +787,23 @@
       el.appendChild(b);
     });
   }
+  function setCallMedia(which) {
+    ['video', 'valve', 'booking'].forEach(k => {
+      document.getElementById('media-' + k).classList.toggle('active', k === which);
+    });
+  }
   function applyCallStep(i) {
     const s = callSteps[i];
     document.getElementById('call-narration').textContent = s.narr;
     const badges = document.getElementById('call-badges');
     badges.innerHTML = '';
     s.badges.forEach(b => {
-      const cls = /emergency/i.test(b) ? 'badge warn' : /booked|located/i.test(b) ? 'badge good' : 'badge';
+      const cls = /emergency/i.test(b) ? 'badge warn' : /booked|booking|located/i.test(b) ? 'badge good' : 'badge';
       const span = document.createElement('span');
       span.className = cls; span.textContent = b;
       badges.appendChild(span);
     });
+    if (s.media) setCallMedia(s.media);
     const layer = document.getElementById('annotation-layer');
     layer.innerHTML = '';
     if (s.annotate) {
@@ -789,6 +826,7 @@
       "Share your screen or camera. I'll describe what I see in real time, flag anything urgent, and walk you through next steps.";
     document.getElementById('call-badges').innerHTML = '<span class="badge">Listening</span>';
     document.getElementById('annotation-layer').innerHTML = '';
+    setCallMedia('video');
     renderCallControls();
   }
   function toggleShare() {
